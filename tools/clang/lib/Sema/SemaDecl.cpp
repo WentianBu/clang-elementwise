@@ -8880,6 +8880,13 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
   if (FD) {
     FD->setBody(Body);
+    
+    // Add by Wentian Bu
+    if(Sema::ElementWiseOn)
+      FD->setElementWise(true);
+    else
+      FD->setElementWise(false);
+    Sema::ElementWiseOn = false;
 
     if (getLangOpts().CPlusPlus1y && !FD->isInvalidDecl() &&
         !FD->isDependentContext()) {

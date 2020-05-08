@@ -256,6 +256,10 @@ public:
 
   bool MSStructPragmaOn; // True when \#pragma ms_struct on
 
+  // for \#pragma elementWise
+  // Added by Wentian Bu
+  bool ElementWiseOn; // True when get a "\#pragma elementWise", and false after set to a function
+
   /// VisContext - Manages the stack for \#pragma GCC visibility.
   void *VisContext; // Really a "PragmaVisStack*"
 
@@ -6584,6 +6588,12 @@ public:
     PMSST_ON    // #pragms ms_struct on
   };
 
+  // // Add by Wentian Bu
+  // enum PragmaElementWiseKind{
+  //   PEW_OFF,
+  //   PEW_ON
+  // };
+
   /// ActOnPragmaPack - Called on well formed \#pragma pack(...).
   void ActOnPragmaPack(PragmaPackKind Kind,
                        IdentifierInfo *Name,
@@ -6594,6 +6604,9 @@ public:
 
   /// ActOnPragmaMSStruct - Called on well formed \#pragma ms_struct [on|off].
   void ActOnPragmaMSStruct(PragmaMSStructKind Kind);
+
+  /// ActOnPragmaElementWise
+  void ActOnPragmaElementWise();
 
   /// ActOnPragmaUnused - Called on well-formed '\#pragma unused'.
   void ActOnPragmaUnused(const Token &Identifier,

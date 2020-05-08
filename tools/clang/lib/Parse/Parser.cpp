@@ -90,6 +90,10 @@ Parser::Parser(Preprocessor &pp, Sema &actions, bool skipFunctionBodies)
   FPContractHandler.reset(new PragmaFPContractHandler());
   PP.AddPragmaHandler("STDC", FPContractHandler.get());
 
+// Added by Wentian Bu
+  ElementWiseHandler.reset(new PragmaElementWiseHandler());
+  PP.AddPragmaHandler(ElementWiseHandler.get());
+
   if (getLangOpts().OpenCL) {
     OpenCLExtensionHandler.reset(new PragmaOpenCLExtensionHandler());
     PP.AddPragmaHandler("OPENCL", OpenCLExtensionHandler.get());
@@ -449,6 +453,10 @@ Parser::~Parser() {
   PP.RemovePragmaHandler("STDC", FPContractHandler.get());
   FPContractHandler.reset();
 
+// Added by Wentian Bu
+  PP.RemovePragmaHandler(ElementWiseHandler.get());
+  ElementWiseHandler.reset();
+
   PP.removeCommentHandler(CommentSemaHandler.get());
 
   PP.clearCodeCompletionHandler();
@@ -622,6 +630,10 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
     return DeclGroupPtrTy();
   case tok::annot_pragma_msstruct:
     HandlePragmaMSStruct();
+    return DeclGroupPtrTy();
+  // Add by Wentian Bu
+  case tok::annot_pragma_elementWise:
+    HandlePragmaElementWise();
     return DeclGroupPtrTy();
   case tok::annot_pragma_align:
     HandlePragmaAlign();

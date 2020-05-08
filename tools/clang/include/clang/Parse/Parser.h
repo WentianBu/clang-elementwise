@@ -150,6 +150,7 @@ class Parser : public CodeCompletionHandler {
   OwningPtr<CommentHandler> CommentSemaHandler;
   OwningPtr<PragmaHandler> OpenMPHandler;
   OwningPtr<PragmaHandler> MSCommentHandler;
+  OwningPtr<PragmaHandler> ElementWiseHandler;
 
   /// Whether the '>' token acts as an operator or not. This will be
   /// true except when we are parsing an expression within a C++
@@ -445,6 +446,11 @@ private:
   /// \brief Handle the annotation token produced for
   /// #pragma clang __debug captured
   StmtResult HandlePragmaCaptured();
+
+  /// \brief Handle the annotation token produced for
+  /// #pragma elementWise
+  /// Added by Wentian Bu
+  void HandlePragmaElementWise();
 
   /// GetLookAheadToken - This peeks ahead N tokens and returns that token
   /// without consuming any tokens.  LookAhead(0) returns 'Tok', LookAhead(1)

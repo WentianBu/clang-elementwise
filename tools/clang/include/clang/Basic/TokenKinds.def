@@ -661,6 +661,12 @@ ANNOTATION(pragma_opencl_extension)
 ANNOTATION(pragma_openmp)
 ANNOTATION(pragma_openmp_end)
 
+// Annotations for ElementWise pragma directives - #pragma elementWise
+// The lexer produces these so that they only take effect when the parser
+// handles them.
+// Added by Wentian Bu
+ANNOTATION(pragma_elementWise)
+
 #undef ANNOTATION
 #undef TESTING_KEYWORD
 #undef OBJC2_AT_KEYWORD

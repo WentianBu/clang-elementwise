@@ -271,6 +271,12 @@ Retry:
     ProhibitAttributes(Attrs);
     HandlePragmaMSStruct();
     return StmtEmpty();
+  
+  // Add by Wentian Bu
+  case tok::annot_pragma_elementWise:
+    ProhibitAttributes(Attrs);
+    HandlePragmaElementWise();
+    return StmtEmpty();
 
   case tok::annot_pragma_align:
     ProhibitAttributes(Attrs);
@@ -742,6 +748,9 @@ void Parser::ParseCompoundStatementLeadingPragmas() {
       break;
     case tok::annot_pragma_msstruct:
       HandlePragmaMSStruct();
+      break;
+    // Add by Wentian Bu
+      HandlePragmaElementWise();
       break;
     case tok::annot_pragma_align:
       HandlePragmaAlign();

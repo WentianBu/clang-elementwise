@@ -1409,6 +1409,7 @@ private:
   bool HasImplicitReturnZero : 1;
   bool IsLateTemplateParsed : 1;
   bool IsConstexpr : 1;
+  bool IsElementWise : 1; // Added by Wentian Bu
 
   /// \brief Indicates if the function was a definition but its body was
   /// skipped.
@@ -1718,6 +1719,11 @@ public:
 
   /// Compute the language linkage.
   LanguageLinkage getLanguageLinkage() const;
+
+  /// Whether it is ElementWise
+  // Added by Wentian Bu
+  bool isElementWise() const { return IsElementWise; }
+  void setElementWise(bool E = true) { IsElementWise = E; }
 
   /// \brief Determines whether this function is a function with
   /// external, C linkage.

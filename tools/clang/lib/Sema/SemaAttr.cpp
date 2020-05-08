@@ -263,6 +263,11 @@ void Sema::ActOnPragmaMSStruct(PragmaMSStructKind Kind) {
   MSStructPragmaOn = (Kind == PMSST_ON);
 }
 
+// Added by Wentian Bu
+void Sema::ActOnPragmaElementWise() {
+  ElementWiseOn = true;
+}
+
 void Sema::ActOnPragmaUnused(const Token &IdTok, Scope *curScope,
                              SourceLocation PragmaLoc) {
 

@@ -71,6 +71,13 @@ void Parser::HandlePragmaMSStruct() {
   ConsumeToken(); // The annotation token.
 }
 
+// Add by Wentian Bu
+void Parser::HandlePragmaElementWise() {
+  assert(Tok.is(tok::annot_pragma_elementWise));
+  Actions.ActOnPragmaElementWise();
+  ConsumeToken();
+}
+
 void Parser::HandlePragmaAlign() {
   assert(Tok.is(tok::annot_pragma_align));
   Sema::PragmaOptionsAlignKind Kind =
@@ -402,6 +409,29 @@ void PragmaMSStructHandler::HandlePragma(Preprocessor &PP,
                       /*OwnsTokens=*/false);
 }
 
+
+// #pragma elementWise
+// Add By Wentian Bu
+void PragmaElementWiseHandler::HandlePragma(Preprocessor &PP, 
+                                         PragmaIntroducerKind Introducer,
+                                         Token &FirstToken) {
+  Token Tok;
+  PP.Lex(Tok);
+  if (Tok.isNot(tok::eod)) {
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+      << "elementWise";
+    return;
+  }
+  Token *Toks =
+    (Token*) PP.getPreprocessorAllocator().Allocate(
+      sizeof(Token) * 1, llvm::alignOf<Token>());
+  new (Toks) Token();
+  Toks[0].startToken();
+  Toks[0].setKind(tok::annot_pragma_elementWise);
+  Toks[0].setLocation(FirstToken.getLocation());
+  PP.EnterTokenStream(Toks, 1, /*DisableMacroExpansion=*/true,
+                      /*OwnsTokens=*/false);
+}
 // #pragma 'align' '=' {'native','natural','mac68k','power','reset'}
 // #pragma 'options 'align' '=' {'native','natural','mac68k','power','reset'}
 static void ParseAlignPragma(Preprocessor &PP, Token &FirstTok,
