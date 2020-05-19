@@ -6588,12 +6588,6 @@ public:
     PMSST_ON    // #pragms ms_struct on
   };
 
-  // // Add by Wentian Bu
-  // enum PragmaElementWiseKind{
-  //   PEW_OFF,
-  //   PEW_ON
-  // };
-
   /// ActOnPragmaPack - Called on well formed \#pragma pack(...).
   void ActOnPragmaPack(PragmaPackKind Kind,
                        IdentifierInfo *Name,
