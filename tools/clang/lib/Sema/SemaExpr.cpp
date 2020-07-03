@@ -6303,11 +6303,18 @@ Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &RHS,
   if(this->ElementWiseOn &&
      ConstantArrayType::classof(LHSType.getTypePtr()) &&
      ConstantArrayType::classof(RHS.get()->getType().getTypePtr())) {
-    QualType RHSType = RHS.get()->getType();
+    Expr *r = RHS.get();
+    QualType RHSType = r->getType();
     LHSType = Context.getCanonicalType(LHSType).getUnqualifiedType();
     RHSType = Context.getCanonicalType(RHSType).getUnqualifiedType();
-    if(LHSType == RHSType)
+    if(LHSType == RHSType) {
+      if(!r->isRValue()) {
+        Qualifiers t;
+        RHS = ImplicitCastExpr::Create(Context, Context.getUnqualifiedArrayType(r->getType().getUnqualifiedType(), t), 
+                                       CK_LValueToRValue, const_cast<Expr *>(r), 0, VK_RValue);
+      }
       return Compatible;
+    }
     else
       return Incompatible;
   }
