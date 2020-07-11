@@ -114,6 +114,10 @@ void CodeGenFunction::EmitIgnoredExpr(const Expr *E) {
 RValue CodeGenFunction::EmitAnyExpr(const Expr *E,
                                     AggValueSlot aggSlot,
                                     bool ignoreResult) {
+  // add by Wentian Bu
+  if (E->getType()->getTypeClass() == Type::ConstantArray) {
+    return RValue::get(EmitElementWiseExpr(E, ignoreResult));
+  }
   switch (getEvaluationKind(E->getType())) {
   case TEK_Scalar:
     return RValue::get(EmitScalarExpr(E, ignoreResult));
@@ -3354,4 +3358,133 @@ RValue CodeGenFunction::EmitPseudoObjectRValue(const PseudoObjectExpr *E,
 
 LValue CodeGenFunction::EmitPseudoObjectLValue(const PseudoObjectExpr *E) {
   return emitPseudoObjectExpr(*this, E, true, AggValueSlot::ignored()).LV;
+}
+
+// emit element-wise expr (A, B, C are arrays)
+// C = A, C = A + B, C = A * B
+// for(int i=0; i< arraylen; i++)
+//    C[i] = A[i] + B[i];
+// add by Wentian Bu
+llvm::Value *CodeGenFunction::EmitElementWiseExpr(const Expr *E, bool IgnoreResultAssign) {
+  if (BinaryOperator::classof(E)) {
+    // E is a binop expr - handle it recursively
+    const BinaryOperator *BO = dyn_cast<BinaryOperator>(E);
+    Expr *LHS = BO->getLHS();
+    Expr *RHS = BO->getRHS();
+    llvm::Value *LHSv, *RHSv;
+    if (BO->getOpcode() == BO_Assign) {
+      // the LHS of assign op must be a varaible
+      // get the value of the variable
+      const DeclRefExpr *de = dyn_cast<DeclRefExpr>(LHS);
+      LHSv = LocalDeclMap.lookup(de->getDecl());
+    } else {
+      // handle LHS recursively
+      LHSv = EmitElementWiseExpr(LHS);
+    }
+    // always handle RHS recursively
+    RHSv = EmitElementWiseExpr(RHS);
+
+    // emit loop structure
+    // allocate temp array for +, * result
+    QualType TyR = E->getType().getUnqualifiedType();
+    llvm::Type *LTyR = ConvertTypeForMem(TyR);
+    llvm::AllocaInst *AllocR;  // memory will be allocated in body, if op!=assign
+
+    // allocate loop variable
+    QualType TyI = getContext().UnsignedIntTy;
+    llvm::Type *LTyI = ConvertTypeForMem(TyI);
+    llvm::AllocaInst *AllocI = CreateTempAlloca(LTyI, "idx");
+    AllocI->setAlignment(4);
+
+    // Initialize loop variable
+    llvm::StoreInst *InitI = Builder.CreateStore(llvm::ConstantInt::get(LTyI, llvm::APInt(32, 0)),
+                                                 (llvm::Value *)AllocI, false);
+    InitI->setAlignment(4);
+
+    // create basic blocks
+    llvm::BasicBlock *CondBlock = createBasicBlock("for.cond");
+    llvm::BasicBlock *BodyBlock = createBasicBlock("for.body");
+    llvm::BasicBlock *ExitBlock = createBasicBlock("for.exit");
+
+    // Blocks must be emitted before add instructions to it
+    // Emit for.cond
+    EmitBlock(CondBlock);
+    llvm::LoadInst *CondLoadI = Builder.CreateLoad((llvm::Value *)AllocI, "");
+    CondLoadI->setAlignment(4);
+    llvm::Value *idx = Builder.CreateIntCast(CondLoadI, IntPtrTy, false, "idxpromo");
+    // get array size
+    const ConstantArrayType *CATy = dyn_cast<ConstantArrayType>(TyR);
+    llvm::Value *sz = llvm::ConstantInt::get(IntPtrTy, CATy->getSize());
+    // create comparison
+    llvm::Value *CondCmp = Builder.CreateICmpSLT(idx, sz, "");
+    Builder.CreateCondBr(CondCmp, BodyBlock, ExitBlock);
+
+    // Emit for.body
+    EmitBlock(BodyBlock);
+    // get array ptr
+    llvm::Value *LHSArrayPtr = MakeAddrLValue(LHSv, TyR).getAddress();
+    llvm::Value *RHSArrayPtr = MakeAddrLValue(RHSv, TyR).getAddress();
+    // get element ptr
+    llvm::Value *Zero = llvm::ConstantInt::get(Int32Ty, 0);
+    llvm::Value *BCArgs[] = {Zero, idx}; // Boundary Check args
+    llvm::Value *LHSAddr = Builder.CreateInBoundsGEP(LHSArrayPtr, BCArgs, "");
+    llvm::Value *RHSAddr = Builder.CreateInBoundsGEP(RHSArrayPtr, BCArgs, "");
+    if (BO->getOpcode() == BO_Assign) {
+      // create load and store inst
+      llvm::LoadInst *BodyLoad = Builder.CreateLoad(RHSAddr, "");
+      BodyLoad->setAlignment(4);
+      llvm::StoreInst *BodyStore = Builder.CreateStore((llvm::Value *)BodyLoad, LHSAddr, false);
+      BodyStore->setAlignment(4);
+    } else {
+      // allocate space for temp result, then get ptr and element ptr
+      AllocR = CreateTempAlloca(LTyR, "");
+      AllocR->setAlignment(4);
+      llvm::Value *RESArrayPtr = MakeAddrLValue((llvm::Value *)AllocR, TyR).getAddress();
+      llvm::Value *RESAddr = Builder.CreateInBoundsGEP(RESArrayPtr, BCArgs, "");
+      // create load inst
+      llvm::LoadInst *BodyLoadLeft = Builder.CreateLoad(LHSAddr, "");
+      llvm::LoadInst *BodyLoadRight = Builder.CreateLoad(RHSAddr, "");
+      BodyLoadLeft->setAlignment(4);
+      BodyLoadRight->setAlignment(4);
+      llvm::Value *BodyArithmeticInst;
+      // create arithmetic inst
+      if (BO->getOpcode() == BO_Add) {
+        BodyArithmeticInst = Builder.CreateAdd((llvm::Value *)BodyLoadLeft,
+                                               (llvm::Value *)BodyLoadRight, "addres");
+      }
+      if (BO->getOpcode() == BO_Mul) {
+        BodyArithmeticInst = Builder.CreateMul((llvm::Value *)BodyLoadLeft, 
+                                               (llvm::Value *)BodyLoadRight, "mulres");
+      }
+      // create store inst
+      llvm::StoreInst *BodyStoreRes = Builder.CreateStore(BodyArithmeticInst, RESAddr, false);
+      BodyStoreRes->setAlignment(4);
+    }
+    // loop variable increment and branch
+    llvm::LoadInst *LVLoad = Builder.CreateLoad((llvm::Value *)AllocI, "");
+    LVLoad->setAlignment(4);
+    llvm::Value *LVInc = Builder.CreateAdd((llvm::Value *)LVLoad, llvm::ConstantInt::get(Int32Ty, 1), "");
+    llvm::StoreInst *LVStore = Builder.CreateStore(LVInc, (llvm::Value *)AllocI, false);
+    LVStore->setAlignment(4);
+    Builder.CreateBr(CondBlock);
+
+    // emit exit block
+    EmitBlock(ExitBlock);
+
+    // return
+    if (BO->getOpcode() == BO_Assign) {
+      return LHSv;
+    } else {
+      return (llvm::Value *)AllocR;
+    }
+  } else {
+    // if E is not a binop expr - maybe a implicit cast or a variable
+    if (ImplicitCastExpr::classof(E)) {
+      E = dyn_cast<ImplicitCastExpr>(E)->getSubExpr();
+    }
+    // return the value of the variable
+    assert(DeclRefExpr::classof(E));
+    const DeclRefExpr *de = dyn_cast<DeclRefExpr>(E);
+    return LocalDeclMap.lookup(de->getDecl());
+  }
 }

@@ -2597,6 +2597,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   // Expressions are broken into three classes: scalar, complex, aggregate.
+  
+  /// EmitElementWiseExpr - Emit the element-wise operation marked with 
+  /// #pragma elementWise
+  // add by Wentian Bu
+  llvm::Value *EmitElementWiseExpr(const Expr *E, bool IgnoreResultAssign = false);
 
   /// EmitScalarExpr - Emit the computation of the specified expression of LLVM
   /// scalar type, returning the result.
